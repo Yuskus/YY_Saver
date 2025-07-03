@@ -1,68 +1,40 @@
-﻿using YoutubeExplode;
-using YoutubeExplode.Videos.Streams;
-using YoutubeExtractor;
+﻿using YY_Saver.VideoSaver.SaveVideoByUrl.Explode;
+using YY_Saver.Extensions;
 
-namespace YY_Saver
+namespace YY_Saver;
+
+public class Program
 {
-    internal class Program
+    public static async Task Main()
     {
-        static void Main()
-        {
-            // private settings
-            EnvSettings.Configure();
+        // private environments settings
+        EnvSettings.Configure();
 
-            // save
-            Console.WriteLine("Enter youtube url:");
-            string? url = Console.ReadLine();
-            SafetyCall(() => GetVideoFromYoutubeExplode(url).Wait(), "YoutubeExplode");
-            SafetyCall(() => GetVideoFromYoutubeExtractor(url), "YoutubeExtractor");
-        }
+        // create token source
+        using var source = new CancellationTokenSource();
 
-        static void SafetyCall(Action action, string source)
-        {
-            try { action(); } catch (Exception ex) { Console.WriteLine(source + ":\n" + ex.Message); }
-        }
+        // save video
+        string? url = EnterUrl();
+        var saver = new YoutubeExplodeSaver();
+        _ = DelegateExtension.SafetyCall(() => saver.SaveVideo(url, source.Token));
 
-        static async Task GetVideoFromYoutubeExplode(string? url)
-        {
-            if (url == null) return;
+        // interrupt if pressed any key
+        await PressAnyKeyToInterrupt(source);
+    }
 
-            // get info and video
-            var youtube = new YoutubeClient();
-            var video = await youtube.Videos.GetAsync(url);
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url);
-            var streamInfo = streamManifest
-                .GetVideoStreams()
-                .Where(s => s.Container == Container.Mp4)
-                .GetWithHighestVideoQuality();
+    static string? EnterUrl()
+    {
+        Console.WriteLine("Enter youtube url:");
+        string? url = Console.ReadLine();
+        return url;
+    }
 
-            // set result info
-            string title = video.Title;
-            string quality = streamInfo.VideoQuality.Label;
-            string size = streamInfo.Size.MegaBytes.ToString();
-            string path = $"YY_VIDEO_{video.Title.Replace(" ", "_")}_{DateTime.Now:yyyy.dd.MM.HH.mm.ss}";
-            string result = "\n" +
-                $"\tName: {video.Title}\n" +
-                $"\tQuality: {streamInfo.VideoQuality.Label}\n" +
-                $"\tTotal size (Mb): {streamInfo.Size.MegaBytes}\n" +
-                $"\tFile Path: {path}" +
-                $"\n" +
-                $"\tDownloading started.\n";
-
-            // downloading
-            _ = youtube.Videos.Streams.DownloadAsync(streamInfo, path).AsTask();
-
-            Console.WriteLine(result);
-        }
-
-        static void GetVideoFromYoutubeExtractor(string? videoUrl)
-        {
-            if (videoUrl == null) return;
-            var videoInfos = DownloadUrlResolver.GetDownloadUrls(videoUrl);
-            var video = videoInfos.Where(x => x.VideoType == VideoType.Mp4).OrderByDescending(x => x.Resolution).First();
-            var videoDownloader = new VideoDownloader(video, Path.Combine(Environment.CurrentDirectory, "YYVideo " + video.Title + ".mp4"));
-            videoDownloader.DownloadProgressChanged += (sender, e) => { Console.WriteLine($"Downloaded {e.ProgressPercentage}%"); };
-            videoDownloader.Execute();
-        }
+    static async Task PressAnyKeyToInterrupt(CancellationTokenSource source)
+    {
+        Console.ReadKey(true);
+        await source.CancelAsync();
+        Console.WriteLine();
+        Console.WriteLine("Interrupted.");
+        await Task.Delay(2000, CancellationToken.None);
     }
 }
