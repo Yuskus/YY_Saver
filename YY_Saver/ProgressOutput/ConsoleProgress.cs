@@ -14,7 +14,7 @@ internal class ConsoleProgress : IProgress<double>, IDisposable
     public void Report(double progress)
     {
         int fillCount = (int)(progress * 100) / 2;
-        int emptyCount = 50 - (int)(progress * 100) / 2;
+        int emptyCount = 50 - fillCount;
 
         _progressLine.Clear();
 

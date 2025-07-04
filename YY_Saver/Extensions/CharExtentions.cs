@@ -9,6 +9,6 @@ public static class CharExtentions
 
     public static IEnumerable<char> ReplaceAllExceptLettersAndDigits(this IEnumerable<char> chars, char to)
     {
-        return chars.Select(x => !char.IsLetterOrDigit(x) ? to : char.ToLower(x));
+        return chars.Select(symbol => !char.IsLetterOrDigit(symbol) ? to : symbol);
     }
 }

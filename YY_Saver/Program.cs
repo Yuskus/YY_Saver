@@ -1,5 +1,4 @@
 ﻿using YY_Saver.VideoSaver.SaveVideoByUrl.Explode;
-using YY_Saver.Extensions;
 
 namespace YY_Saver;
 
@@ -8,7 +7,8 @@ public class Program
     public static async Task Main()
     {
         // private environments settings
-        EnvSettings.Configure();
+        using var settings = new EnvSettings();
+        settings.Configure();
 
         // create token source
         using var source = new CancellationTokenSource();
@@ -16,7 +16,7 @@ public class Program
         // save video
         string? url = EnterUrl();
         var saver = new YoutubeExplodeSaver();
-        _ = DelegateExtension.SafetyCall(() => saver.SaveVideo(url, source.Token));
+        _ = saver.SaveVideo(url, source.Token);
 
         // interrupt if pressed any key
         await PressAnyKeyToInterrupt(source);
@@ -33,8 +33,6 @@ public class Program
     {
         Console.ReadKey(true);
         await source.CancelAsync();
-        Console.WriteLine();
-        Console.WriteLine("Interrupted.");
         await Task.Delay(2000, CancellationToken.None);
     }
 }

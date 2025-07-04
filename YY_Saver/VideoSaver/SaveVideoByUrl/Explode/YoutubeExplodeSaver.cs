@@ -12,36 +12,50 @@ public class YoutubeExplodeSaver : ISaveVideoByUrl
 
     public async Task SaveVideo(string? url, CancellationToken cancellationToken = default)
     {
-        if (url == null) return;
+        if (string.IsNullOrWhiteSpace(url))
+            throw new ArgumentNullException(nameof(url), $"Argument {nameof(url)} is null or whitespace.");
 
-        await Console.Out.WriteLineAsync("Getting information...");
+        try
+        {
+            await Console.Out.WriteLineAsync("Getting information...");
 
-        // get info and video
-        var youtube = new YoutubeClient();
-        var video = await youtube.Videos.GetAsync(url, cancellationToken: cancellationToken);
-        var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url, cancellationToken: cancellationToken);
-        var streamInfo = streamManifest
-            .GetVideoStreams()
-            .Where(s => s.Container == Container.Mp4)
-            .GetWithHighestVideoQuality();
+            var searchingFormat = Container.Mp4;
 
-        // set result info
-        string path = _preparer.Prepare(video.Title, "mp4");
+            // get info and video
+            var youtube = new YoutubeClient();
+            var video = await youtube.Videos.GetAsync(url, cancellationToken: cancellationToken);
+            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url, cancellationToken: cancellationToken);
+            var streamInfo = streamManifest
+                .GetVideoStreams()
+                .Where(s => s.Container == searchingFormat)
+                .GetWithHighestVideoQuality();
 
-        await WriteVideoInfo(video, streamInfo, path);
+            // set result info
+            string path = _preparer.Prepare(video.Title, searchingFormat);
 
-        // downloading
-        using var progress = new ConsoleProgress();
-        var downloading = youtube.Videos.Streams.DownloadAsync(
-            streamInfo: streamInfo,
-            filePath: path,
-            cancellationToken: cancellationToken,
-            progress: progress);
+            await WriteVideoInfo(video, streamInfo, path);
 
-        _ = RemoveByToken(path, cancellationToken);
+            // downloading
+            using var progress = new ConsoleProgress();
+            var downloading = youtube.Videos.Streams.DownloadAsync(
+                streamInfo: streamInfo,
+                filePath: path,
+                cancellationToken: cancellationToken,
+                progress: progress);
 
-        await downloading;
-        await SuccesfullyExit();
+            _ = RemoveByToken(path, cancellationToken);
+
+            await downloading;
+            await SuccesfullyExit();
+        }
+        catch (OperationCanceledException)
+        {
+            await Console.Out.WriteLineAsync("Operation cancellation requested.");
+        }
+        catch (Exception e)
+        {
+            await Console.Out.WriteLineAsync($"Error:\n {e.Message}");
+        }
     }
 
     private static async Task WriteVideoInfo(Video video, IVideoStreamInfo streamInfo, string path)
@@ -62,7 +76,7 @@ public class YoutubeExplodeSaver : ISaveVideoByUrl
             if (cancellationToken.IsCancellationRequested)
             {
                 File.Delete(path);
-                await Console.Out.WriteLineAsync("Removed.");
+                await Console.Out.WriteLineAsync("\nRemoved.");
                 return;
             }
 
